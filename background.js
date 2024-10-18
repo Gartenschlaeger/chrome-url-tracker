@@ -13,25 +13,35 @@ function addUrl(url) {
     timestamp: new Date().toISOString()
   });
   chrome.storage.local.set({ urlList });
-  updateBadge(); // Update badge after adding a URL
+  updateBadge();
 }
 
 function updateDeclarativeNetRequestRules() {
-  const rules = filters.map((filter, index) => ({
-    id: index + 1,
-    priority: 1,
-    action: {
-      type: 'allow'
-    },
-    condition: {
-      urlFilter: filter.hostname,
-      resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'csp_report', 'media', 'websocket', 'other']
-    }
-  }));
+  chrome.declarativeNetRequest.getDynamicRules((existingRules) => {
+    const existingRuleIds = existingRules.map(rule => rule.id);
 
-  chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: rules.map(rule => rule.id),
-    addRules: rules
+    const newRules = filters.map((filter, index) => ({
+      id: index + 1,
+      priority: 1,
+      action: {
+        type: 'allow'
+      },
+      condition: {
+        urlFilter: filter.hostname,
+        resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script', 'image', 'font', 'object', 'xmlhttprequest', 'ping', 'csp_report', 'media', 'websocket', 'other']
+      }
+    }));
+
+    chrome.declarativeNetRequest.updateDynamicRules({
+      removeRuleIds: existingRuleIds,
+      addRules: newRules
+    }, () => {
+      if (chrome.runtime.lastError) {
+        console.error('Error updating rules:', chrome.runtime.lastError);
+      } else {
+        console.log('Rules updated successfully');
+      }
+    });
   });
 }
 
@@ -41,7 +51,7 @@ chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
 
 function updateBadge() {
   chrome.action.setBadgeText({text: urlList.length.toString()});
-  chrome.action.setBadgeBackgroundColor({color: '#FF0000'}); // Red color
+  chrome.action.setBadgeBackgroundColor({color: '#FF0000'});
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -52,7 +62,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     case 'clearUrlList':
       urlList = [];
       chrome.storage.local.set({ urlList });
-      updateBadge(); // Update badge after clearing the list
+      updateBadge();
       sendResponse({ success: true });
       break;
     case 'getFilters':
@@ -80,5 +90,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
-// Initial badge update
 updateBadge();
