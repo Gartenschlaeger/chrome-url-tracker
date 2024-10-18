@@ -16,25 +16,51 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateUrlList() {
     chrome.runtime.sendMessage({ action: 'getUrlList' }, (response) => {
       urlList.innerHTML = '';
-      response.urlList.forEach((item) => {
+      if (response.urlList.length === 0) {
         const li = document.createElement('li');
-        li.className = 'list-group-item';
-        const truncatedUrl = truncateUrl(item.url);
-        li.innerHTML = `
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="url-text" title="${item.url}">
-              <i class="bi bi-chevron-right me-2 toggle-icon"></i>
-              ${truncatedUrl}
-            </span>
-            <small class="text-muted">${new Date(item.timestamp).toLocaleString()}</small>
-          </div>
-          <div class="url-details mt-2"></div>
-        `;
-        const toggleIcon = li.querySelector('.toggle-icon');
-        const detailsDiv = li.querySelector('.url-details');
-        li.addEventListener('click', () => toggleUrlDetails(item.url, detailsDiv, toggleIcon));
+        li.className = 'list-group-item text-muted';
+        li.textContent = 'No URLs. Please refresh the page to start searching.';
         urlList.appendChild(li);
-      });
+      } else {
+        response.urlList.forEach((item) => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item';
+          const truncatedUrl = truncateUrl(item.url);
+          li.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="url-text" title="${item.url}">
+                <i class="bi bi-chevron-right me-2 toggle-icon"></i>
+                <i class="bi bi-clipboard me-2 copy-icon" title="Copy full URL"></i>
+                ${truncatedUrl}
+              </span>
+              <small class="text-muted">${new Date(item.timestamp).toLocaleString()}</small>
+            </div>
+            <div class="url-details mt-2" style="display: none;"></div>
+          `;
+          const toggleIcon = li.querySelector('.toggle-icon');
+          const detailsDiv = li.querySelector('.url-details');
+          const copyIcon = li.querySelector('.copy-icon');
+          
+          li.addEventListener('click', (e) => {
+            if (!e.target.closest('.copy-icon')) {
+              toggleUrlDetails(item.url, detailsDiv, toggleIcon);
+            }
+          });
+          
+          copyIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(item.url);
+            copyIcon.classList.remove('bi-clipboard');
+            copyIcon.classList.add('bi-check2');
+            setTimeout(() => {
+              copyIcon.classList.remove('bi-check2');
+              copyIcon.classList.add('bi-clipboard');
+            }, 2000);
+          });
+          
+          urlList.appendChild(li);
+        });
+      }
     });
   }
 
@@ -45,7 +71,14 @@ document.addEventListener('DOMContentLoaded', () => {
         response.filters.forEach((filter, index) => {
           const li = document.createElement('li');
           li.className = 'list-group-item d-flex justify-content-between align-items-center';
-          li.textContent = `${filter.hostname} (${filter.protocol})`;
+          
+          const filterText = document.createElement('span');
+          if (filter.protocol === 'All') {
+            filterText.textContent = filter.hostname;
+          } else {
+            filterText.innerHTML = `<span class="text-muted">${filter.protocol}://</span>${filter.hostname}`;
+          }
+          li.appendChild(filterText);
           
           const btnGroup = document.createElement('div');
           btnGroup.className = 'btn-group';
@@ -82,28 +115,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function toggleUrlDetails(urlString, detailsDiv, toggleIcon) {
     if (detailsDiv.style.display === 'none' || detailsDiv.style.display === '') {
-      let details;
-      try {
-        const url = new URL(urlString);
-        details = {
-          Protocol: url.protocol.slice(0, -1),
-          Hostname: url.hostname,
-          Path: url.pathname,
-          'Query Strings': Object.fromEntries(url.searchParams.entries()),
-          Segment: url.hash
-        };
-      } catch (error) {
-        details = {
-          Error: 'Invalid URL',
-          'Raw URL': urlString
-        };
+      const url = new URL(urlString);
+      const queryParams = Array.from(url.searchParams.entries());
+
+      let details = {};
+
+      if (url.protocol) {
+        details['Protocol'] = url.protocol.slice(0, -1);
       }
-      
+
+      if (url.hostname) {
+        details['Hostname'] = url.hostname;
+      }
+
+      if (url.pathname && url.pathname !== '/') {
+        details['Path'] = url.pathname;
+      }
+
+      if (queryParams.length > 0) {
+        details['Query Parameters'] = '<ul class="list-unstyled mb-0">' + 
+          queryParams.map(([key, value]) => 
+            `<li><strong>${key}:</strong> <code>${decodeURIComponent(value)}</code> <i class="bi bi-clipboard copy-btn" data-clipboard-text="${decodeURIComponent(value)}"></i></li>`
+          ).join('') + 
+        '</ul>';
+      }
+
+      if (url.hash) {
+        details['Fragment'] = url.hash;
+      }
+
       detailsDiv.innerHTML = Object.entries(details).map(([key, value]) => `
-        <div class="mb-1">
+        <div class="mb-2">
           <strong>${key}:</strong> 
-          <code class="ms-2">${JSON.stringify(value)}</code>
-          <i class="bi bi-clipboard copy-btn ms-2" data-clipboard-text="${JSON.stringify(value)}"></i>
+          ${typeof value === 'string' && !value.startsWith('<ul') ? `<code>${value}</code>` : value}
+          ${typeof value === 'string' && !value.startsWith('<ul') ? `<i class="bi bi-clipboard copy-btn" data-clipboard-text="${value}"></i>` : ''}
         </div>
       `).join('');
       
@@ -146,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
   clearListBtn.addEventListener('click', () => {
     chrome.runtime.sendMessage({ action: 'clearUrlList' }, () => {
       updateUrlList();
+      updateClearListButtonVisibility();
     });
   });
 
@@ -173,4 +219,102 @@ document.addEventListener('DOMContentLoaded', () => {
 
   updateUrlList();
   updateFilterList();
+  updateClearListButtonVisibility();
 });
+
+function showDetailView(url) {
+  mainScrollPosition = window.scrollY;
+
+  const detailContent = document.getElementById('detailContent');
+  const urlObj = new URL(url);
+  const queryParams = Array.from(urlObj.searchParams.entries());
+
+  let detailHtml = '';
+
+  if (urlObj.protocol) {
+    detailHtml += `<div><strong>Protocol:</strong> <code>${urlObj.protocol.slice(0, -1)}</code> <i class="bi bi-clipboard copy-btn" data-clipboard-text="${urlObj.protocol.slice(0, -1)}"></i></div>`;
+  }
+
+  if (urlObj.hostname) {
+    detailHtml += `<div><strong>Hostname:</strong> <code>${urlObj.hostname}</code> <i class="bi bi-clipboard copy-btn" data-clipboard-text="${urlObj.hostname}"></i></div>`;
+  }
+
+  if (urlObj.pathname && urlObj.pathname !== '/') {
+    detailHtml += `<div><strong>Path:</strong> <code>${urlObj.pathname}</code> <i class="bi bi-clipboard copy-btn" data-clipboard-text="${urlObj.pathname}"></i></div>`;
+  }
+
+  if (queryParams.length > 0) {
+    detailHtml += '<div><strong>Query Parameters:</strong><ul>';
+    queryParams.forEach(([key, value]) => {
+      const decodedValue = decodeURIComponent(value);
+      detailHtml += `
+        <li class="query-param">
+          <strong>${key}:</strong> <code>${decodedValue}</code> <i class="bi bi-clipboard copy-btn" data-clipboard-text="${decodedValue}"></i>
+        </li>
+      `;
+    });
+    detailHtml += '</ul></div>';
+  }
+
+  if (urlObj.hash) {
+    detailHtml += `<div><strong>Fragment:</strong> <code>${urlObj.hash}</code> <i class="bi bi-clipboard copy-btn" data-clipboard-text="${urlObj.hash}"></i></div>`;
+  }
+
+  detailContent.innerHTML = detailHtml;
+
+  // Add event listeners for copy buttons
+  detailContent.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      navigator.clipboard.writeText(e.target.dataset.clipboardText);
+      e.target.classList.remove('bi-clipboard');
+      e.target.classList.add('bi-check2');
+      setTimeout(() => {
+        e.target.classList.remove('bi-check2');
+        e.target.classList.add('bi-clipboard');
+      }, 2000);
+    });
+  });
+
+  document.querySelector('.slide-container').style.transform = 'translateX(-50%)';
+  document.querySelector('.detail-view').classList.remove('hidden');
+  
+  // Use requestAnimationFrame to ensure the scroll happens in the next paint cycle
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0);
+  });
+}
+
+function hideDetailView() {
+  document.querySelector('.slide-container').style.transform = 'translateX(0)';
+  document.querySelector('.detail-view').classList.add('hidden');
+  
+  // Use requestAnimationFrame to ensure the scroll happens in the next paint cycle
+  requestAnimationFrame(() => {
+    window.scrollTo(0, mainScrollPosition);
+  });
+}
+
+let mainScrollPosition = 0;
+
+function initializePopup() {
+  mainScrollPosition = 0;
+  window.scrollTo(0, 0);
+
+  // Add event listeners for scroll position
+  window.addEventListener('scroll', () => {
+    const detailView = document.querySelector('.detail-view');
+    if (detailView && detailView.classList.contains('hidden')) {
+      mainScrollPosition = window.scrollY;
+    }
+  });
+}
+
+// Call initializePopup when the DOM is loaded
+document.addEventListener('DOMContentLoaded', initializePopup);
+
+function updateClearListButtonVisibility() {
+  const clearListBtn = document.getElementById('clearList');
+  chrome.runtime.sendMessage({ action: 'getUrlList' }, (response) => {
+    clearListBtn.style.display = response.urlList.length > 0 ? 'block' : 'none';
+  });
+}

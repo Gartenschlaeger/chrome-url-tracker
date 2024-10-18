@@ -9,13 +9,9 @@
   <style>
     body {
       width: 750px;
-      padding: 10px;
+      padding: 0.5em;
       overflow-x: hidden;
-    }
-    .scrollable-urls {
-      max-height: 400px;
       overflow-y: auto;
-      padding-right: 5px;
     }
     .url-details {
       display: none;
@@ -35,35 +31,74 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+    .slide-container {
+      width: calc(200% + 17px); /* Add scrollbar width */
+      display: flex;
+      transition: transform 0.3s ease-in-out;
+      min-height: 100%;
+    }
+    .main-view, .detail-view {
+      width: calc(50% - 8.5px); /* Adjust for scrollbar width */
+      flex-shrink: 0;
+    }
+    .hidden {
+      display: none;
+    }
+    .query-param {
+      margin-bottom: 5px;
+    }
+    .detail-view {
+      padding: 15px;
+    }
+    #backButton {
+      position: sticky;
+      top: 15px;
+      z-index: 1000;
+    }
+    #detailContent > div {
+      margin-bottom: 10px;
+    }
+    .copy-full-url {  
+      padding: 0.25rem 0.5rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    .copy-icon {
+      cursor: pointer;
+      color: #6c757d;
+    }
+    .copy-icon:hover {
+      color: #495057;
+    }
+    .matched-urls-header {
+      margin-top: 1rem;
+    }
+    .text-muted {
+      color: #6c757d !important;
+    }
   </style>
 </head>
 <body>
   <form id="filterForm" class="mb-3">
-    <div class="row g-2">
-      <div class="col-md-12 mb-2">
-        <select class="form-select" id="protocol" required>
-          <option value="All">All protocols</option>
-          <option value="http">http</option>
-          <option value="https">https</option>
-        </select>
-      </div>
-      <div class="col-md-9">
-        <input type="text" class="form-control" id="hostname" placeholder="Hostname" required>
-      </div>
-      <div class="col-md-3">
-        <button type="submit" class="btn btn-primary w-100">Add</button>
-      </div>
+    <div class="input-group">
+      <select class="form-select flex-grow-0 w-auto" id="protocol" required>
+        <option value="All">All protocols</option>
+        <option value="http">http</option>
+        <option value="https">https</option>
+      </select>
+      <input type="text" class="form-control" id="hostname" placeholder="Enter hostname" required>
+      <button type="submit" class="btn btn-primary">Add</button>
     </div>
   </form>
 
   <ul id="filterList" class="list-group mb-3"></ul>
 
-  <h5 class="mt-3">Matched URLs</h5>
-  <button id="clearList" class="btn btn-danger w-100">Clear List</button>
-  <div class="scrollable-urls">
-    <ul id="urlList" class="list-group"></ul>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0">Matched URLs</h5>
+    <button id="clearList" class="btn btn-sm btn-outline-danger">Clear List</button>
   </div>
-  
+  <ul id="urlList" class="list-group"></ul>
+
   <script src="popup.js"></script>
 </body>
 </html>
