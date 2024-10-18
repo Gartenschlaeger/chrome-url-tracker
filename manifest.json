@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "URL Filter and Tracker",
+  "version": "1.0",
+  "description": "Monitors and filters accessed URLs",
+  "permissions": [
+    "storage",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
