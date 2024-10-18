@@ -6,13 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const hostnameInput = document.getElementById('hostname');
   const protocolSelect = document.getElementById('protocol');
 
-  function truncateUrl(url, maxLength = 50) {
-    if (url.length <= maxLength) return url;
-    const start = url.substr(0, maxLength / 2 - 2);
-    const end = url.substr(-maxLength / 2 + 1);
-    return `${start}...${end}`;
-  }
-
   function updateUrlList() {
     chrome.runtime.sendMessage({ action: 'getUrlList' }, (response) => {
       urlList.innerHTML = '';
@@ -25,15 +18,14 @@ document.addEventListener('DOMContentLoaded', () => {
         response.urlList.forEach((item) => {
           const li = document.createElement('li');
           li.className = 'list-group-item';
-          const truncatedUrl = truncateUrl(item.url);
           li.innerHTML = `
             <div class="d-flex justify-content-between align-items-center">
               <span class="url-text" title="${item.url}">
                 <i class="bi bi-chevron-right me-2 toggle-icon"></i>
                 <i class="bi bi-clipboard me-2 copy-icon" title="Copy full URL"></i>
-                ${truncatedUrl}
+                ${item.url}
               </span>
-              <small class="text-muted">${new Date(item.timestamp).toLocaleString()}</small>
+              <small class="text-muted">${new Date(item.timestamp).toLocaleTimeString()}</small>
             </div>
             <div class="url-details mt-2" style="display: none;"></div>
           `;
