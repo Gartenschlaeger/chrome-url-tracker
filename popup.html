@@ -40,15 +40,15 @@
 <body>
   <form id="filterForm" class="mb-3">
     <div class="row g-2">
-      <div class="col-md-5">
-        <input type="text" class="form-control" id="hostname" placeholder="Hostname" required>
-      </div>
-      <div class="col-md-4">
+      <div class="col-md-12 mb-2">
         <select class="form-select" id="protocol" required>
-          <option value="All">All</option>
+          <option value="All">All protocols</option>
           <option value="http">http</option>
           <option value="https">https</option>
         </select>
+      </div>
+      <div class="col-md-9">
+        <input type="text" class="form-control" id="hostname" placeholder="Hostname" required>
       </div>
       <div class="col-md-3">
         <button type="submit" class="btn btn-primary w-100">Add</button>
